@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "CLO7",
+    "slug": "clo7-front",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "clo7",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.clo7.app"
+    },
+    "android": {
+      "package": "com.clo7.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CLO7 needs access to your photos to add clothing items.",
+          "cameraPermission": "CLO7 needs access to your camera to photograph clothing items."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CLO7 needs your location to get local weather for outfit suggestions."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
