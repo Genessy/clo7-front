@@ -10,8 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
+import { signup } from '@/services/auth';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -19,13 +19,33 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleCreate() {
     if (!name || !email || !password) return;
     setLoading(true);
-    await AsyncStorage.setItem('user', JSON.stringify({ name, email }));
-    setLoading(false);
-    router.replace('/(tabs)/home');
+    setError('');
+    try {
+      await signup(name, email, password);
+      router.replace('/(tabs)/home');
+    } catch (e: any) {
+      setError(getErrorMessage(e.code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function getErrorMessage(code: string) {
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'This email is already in use.';
+      case 'auth/weak-password':
+        return 'Password must be at least 6 characters.';
+      case 'auth/invalid-email':
+        return 'Invalid email address.';
+      default:
+        return 'An error occurred. Please try again.';
+    }
   }
 
   return (
@@ -83,6 +103,8 @@ export default function SignupScreen() {
             />
           </View>
         </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
           style={({ pressed }) => [
@@ -217,5 +239,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     color: Colors.text,
+  },
+  error: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: '#D32F2F',
+    textAlign: 'center',
   },
 });

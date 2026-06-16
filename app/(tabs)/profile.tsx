@@ -1,16 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
+import { logout } from '@/services/auth';
+import { auth } from '@/services/firebase';
 
 type Theme = 'light' | 'dark' | 'system';
-
-interface User {
-  name?: string;
-  email?: string;
-}
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -37,15 +32,8 @@ function Row({ label, value, onPress, last }: { label: string; value?: string; o
 }
 
 export default function ProfileScreen() {
-  const router = useRouter();
-  const [user, setUser] = useState<User>({});
   const [theme, setTheme] = useState<Theme>('system');
-
-  useEffect(() => {
-    AsyncStorage.getItem('user').then((raw) => {
-      if (raw) setUser(JSON.parse(raw));
-    });
-  }, []);
+  const user = auth.currentUser;
 
   function handleLogout() {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
@@ -53,10 +41,7 @@ export default function ProfileScreen() {
       {
         text: 'Log out',
         style: 'destructive',
-        onPress: async () => {
-          await AsyncStorage.removeItem('user');
-          router.replace('/splash');
-        },
+        onPress: () => logout(),
       },
     ]);
   }
@@ -67,8 +52,8 @@ export default function ProfileScreen() {
         <Text style={styles.title}>Profile</Text>
 
         <Section label="ACCOUNT">
-          <Row label="Name" value={user.name || '—'} onPress={() => {}} />
-          <Row label="Email" value={user.email || '—'} onPress={() => {}} />
+          <Row label="Name" value={user?.displayName || '—'} onPress={() => {}} />
+          <Row label="Email" value={user?.email || '—'} onPress={() => {}} />
           <Row label="Edit Profile" onPress={() => {}} last />
         </Section>
 

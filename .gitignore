@@ -37,3 +37,6 @@ Thumbs.db
 
 # Others
 claude.md
+
+# Firebase service account keys
+*-firebase-adminsdk-*.json

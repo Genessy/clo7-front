@@ -10,21 +10,41 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/colors';
+import { login } from '@/services/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleLogin() {
     if (!email || !password) return;
     setLoading(true);
-    await AsyncStorage.setItem('user', JSON.stringify({ email }));
-    setLoading(false);
-    router.replace('/(tabs)/home');
+    setError('');
+    try {
+      await login(email, password);
+      router.replace('/(tabs)/home');
+    } catch (e: any) {
+      setError(getErrorMessage(e.code));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function getErrorMessage(code: string) {
+    switch (code) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':
+        return 'Email or password incorrect.';
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Try again later.';
+      default:
+        return 'An error occurred. Please try again.';
+    }
   }
 
   return (
@@ -71,6 +91,8 @@ export default function LoginScreen() {
             />
           </View>
         </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <Pressable
           style={({ pressed }) => [
@@ -220,5 +242,11 @@ const styles = StyleSheet.create({
   switchLink: {
     color: Colors.primary,
     fontFamily: 'Inter_600SemiBold',
+  },
+  error: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: '#D32F2F',
+    textAlign: 'center',
   },
 });

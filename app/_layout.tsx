@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { Manrope_600SemiBold } from '@expo-google-fonts/manrope';
 import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { type User } from 'firebase/auth';
+import { subscribeToAuthState } from '@/services/auth';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,12 +16,27 @@ export default function RootLayout() {
     Inter_400Regular,
     Inter_600SemiBold,
   });
+  const [user, setUser] = useState<User | null | undefined>(undefined);
+  const router = useRouter();
+  const segments = useSegments();
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    return subscribeToAuthState(setUser);
+  }, []);
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (!fontsLoaded || user === undefined) return;
+    SplashScreen.hideAsync();
+
+    const inTabs = segments[0] === '(tabs)';
+    if (user && !inTabs) {
+      router.replace('/(tabs)/home');
+    } else if (!user && inTabs) {
+      router.replace('/splash');
+    }
+  }, [fontsLoaded, user, segments]);
+
+  if (!fontsLoaded || user === undefined) return null;
 
   return (
     <>
