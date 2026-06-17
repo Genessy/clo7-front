@@ -1,5 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { initializeAuth, getAuth, getReactNativePersistence, type Auth } from 'firebase/auth';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -14,6 +15,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp;
 let auth: Auth;
+let storage: FirebaseStorage;
 
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -23,4 +25,6 @@ if (getApps().length === 0) {
   auth = getAuth(app);
 }
 
-export { auth };
+storage = getStorage(app);
+
+export { auth, storage };

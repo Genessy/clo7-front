@@ -12,7 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '@/constants/colors';
-import { ClothingCategory, Season } from '@/constants/mock-data';
+import { type ClothingCategory, type Season } from '@/constants/mock-data';
+import { createClothing } from '@/services/clothes';
+import { getPendingPhotoUrl, setPendingPhotoUrl } from '@/services/photo-cache';
 
 const CATEGORIES: Array<{ value: ClothingCategory; label: string }> = [
   { value: 'top', label: 'Top' },
@@ -99,18 +101,31 @@ export default function AddDetailsScreen() {
   const [color, setColor] = useState('');
   const [season, setSeason] = useState<Season | null>(null);
   const [material] = useState('100% Cotton');
+  const [saving, setSaving] = useState(false);
 
-  function handleSave() {
+  async function handleSave() {
     if (!name || !category || !season) {
       Alert.alert('Missing fields', 'Please fill in Name, Category, and Season.');
       return;
     }
-    Alert.alert('Saved!', `${name} added to your wardrobe.`, [
-      {
-        text: 'OK',
-        onPress: () => router.replace('/(tabs)/wardrobe'),
-      },
-    ]);
+    setSaving(true);
+    const photoUrl = getPendingPhotoUrl();
+    try {
+      await createClothing({
+        name,
+        category,
+        color,
+        season,
+        material,
+        clothingPhotoUri: photoUrl ?? undefined,
+      });
+      setPendingPhotoUrl(null);
+      router.replace('/(tabs)/wardrobe');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to save clothing. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -207,10 +222,11 @@ export default function AddDetailsScreen() {
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.btnSave, pressed && styles.btnSavePressed]}
+          style={({ pressed }) => [styles.btnSave, pressed && styles.btnSavePressed, saving && styles.btnSaveDisabled]}
           onPress={handleSave}
+          disabled={saving}
         >
-          <Text style={styles.btnSaveText}>Save Clothing</Text>
+          <Text style={styles.btnSaveText}>{saving ? 'Saving…' : 'Save Clothing'}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -368,6 +384,9 @@ const styles = StyleSheet.create({
   },
   btnSavePressed: {
     backgroundColor: Colors.primaryHover,
+  },
+  btnSaveDisabled: {
+    opacity: 0.6,
   },
   btnSaveText: {
     fontFamily: 'Inter_600SemiBold',

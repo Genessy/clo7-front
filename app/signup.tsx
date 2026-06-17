@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/colors';
 import { signup } from '@/services/auth';
+import { createUser } from '@/services/users';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function SignupScreen() {
     setError('');
     try {
       await signup(name, email, password);
+      await createUser();
       router.replace('/(tabs)/home');
     } catch (e: any) {
       setError(getErrorMessage(e.code));

@@ -29,7 +29,8 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
 
     const inTabs = segments[0] === '(tabs)';
-    if (user && !inTabs) {
+    const onAuthScreen = ['index', 'splash', 'login', 'signup'].includes(segments[0] as string);
+    if (user && onAuthScreen) {
       router.replace('/(tabs)/home');
     } else if (!user && inTabs) {
       router.replace('/splash');

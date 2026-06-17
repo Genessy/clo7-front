@@ -6,44 +6,63 @@ import {
   Pressable,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/colors';
+import { uploadImage } from '@/services/storage';
+import { setPendingPhotoUrl } from '@/services/photo-cache';
 
 export default function AddPhotoScreen() {
   const router = useRouter();
   const [clothingPhoto, setClothingPhoto] = useState<string | null>(null);
+  const [clothingPhotoUrl, setClothingPhotoUrl] = useState<string | null>(null);
+  const [uploadingClothing, setUploadingClothing] = useState(false);
   const [tagPhoto, setTagPhoto] = useState<string | null>(null);
 
-  async function pickImage(setter: (uri: string) => void, source: 'camera' | 'gallery') {
+  async function pickImage(source: 'camera' | 'gallery', onPicked: (uri: string) => void) {
     if (source === 'camera') {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Camera access is needed to take photos.');
         return;
       }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      if (!result.canceled) setter(result.assets[0].uri);
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+      if (!result.canceled) onPicked(result.assets[0].uri);
     } else {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Photo library access is needed.');
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      if (!result.canceled) setter(result.assets[0].uri);
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      if (!result.canceled) onPicked(result.assets[0].uri);
     }
   }
 
+  async function handlePickClothing(source: 'camera' | 'gallery') {
+    await pickImage(source, async (uri) => {
+      console.log('[AddPhoto] Image picked:', uri);
+      setClothingPhoto(uri);
+      setClothingPhotoUrl(null);
+      setUploadingClothing(true);
+      try {
+        const url = await uploadImage(uri);
+        setClothingPhotoUrl(url);
+        setPendingPhotoUrl(url);
+      } catch (e) {
+        setClothingPhotoUrl(uri);
+        setPendingPhotoUrl(uri);
+      } finally {
+        setUploadingClothing(false);
+      }
+    });
+  }
+
   const hasPhotos = clothingPhoto || tagPhoto;
+  const uploading = uploadingClothing;
 
   if (!hasPhotos) {
     return (
@@ -61,7 +80,7 @@ export default function AddPhotoScreen() {
           <View style={styles.pickerRow}>
             <Pressable
               style={({ pressed }) => [styles.pickerCard, pressed && styles.pickerCardPressed]}
-              onPress={() => pickImage(setClothingPhoto, 'camera')}
+              onPress={() => handlePickClothing('camera')}
             >
               <Text style={styles.pickerIcon}>📷</Text>
               <Text style={styles.pickerText}>Take Photo</Text>
@@ -69,7 +88,7 @@ export default function AddPhotoScreen() {
 
             <Pressable
               style={({ pressed }) => [styles.pickerCard, pressed && styles.pickerCardPressed]}
-              onPress={() => pickImage(setClothingPhoto, 'gallery')}
+              onPress={() => handlePickClothing('gallery')}
             >
               <Text style={styles.pickerIcon}>🖼</Text>
               <Text style={styles.pickerText}>Gallery</Text>
@@ -99,13 +118,18 @@ export default function AddPhotoScreen() {
               <Text style={styles.removeBtnText}>✕</Text>
             </Pressable>
             {clothingPhoto ? (
-              <Pressable onPress={() => pickImage(setClothingPhoto, 'gallery')}>
+              <Pressable onPress={() => handlePickClothing('gallery')}>
                 <Image source={{ uri: clothingPhoto }} style={styles.photoThumb} />
+                {uploadingClothing && (
+                  <View style={styles.uploadOverlay}>
+                    <ActivityIndicator color="#FFF" />
+                  </View>
+                )}
               </Pressable>
             ) : (
               <Pressable
                 style={styles.emptyThumb}
-                onPress={() => pickImage(setClothingPhoto, 'gallery')}
+                onPress={() => handlePickClothing('gallery')}
               >
                 <Text style={styles.pickerIcon}>📷</Text>
               </Pressable>
@@ -121,13 +145,13 @@ export default function AddPhotoScreen() {
               <Text style={styles.removeBtnText}>✕</Text>
             </Pressable>
             {tagPhoto ? (
-              <Pressable onPress={() => pickImage(setTagPhoto, 'gallery')}>
+              <Pressable onPress={() => pickImage('gallery', setTagPhoto)}>
                 <Image source={{ uri: tagPhoto }} style={styles.photoThumb} />
               </Pressable>
             ) : (
               <Pressable
                 style={styles.emptyThumb}
-                onPress={() => pickImage(setTagPhoto, 'gallery')}
+                onPress={() => pickImage('gallery', setTagPhoto)}
               >
                 <Text style={styles.pickerIcon}>📷</Text>
               </Pressable>
@@ -137,7 +161,12 @@ export default function AddPhotoScreen() {
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.btnContinue, pressed && styles.btnContinuePressed]}
+          style={({ pressed }) => [
+            styles.btnContinue,
+            pressed && styles.btnContinuePressed,
+            uploading && styles.btnContinueDisabled,
+          ]}
+          disabled={uploading}
           onPress={() =>
             router.push({
               pathname: '/add-details',
@@ -148,7 +177,11 @@ export default function AddPhotoScreen() {
             })
           }
         >
-          <Text style={styles.btnContinueText}>Continue to Details</Text>
+          {uploading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.btnContinueText}>Continue to Details</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -275,6 +308,16 @@ const styles = StyleSheet.create({
   },
   btnContinuePressed: {
     backgroundColor: Colors.primaryHover,
+  },
+  btnContinueDisabled: {
+    opacity: 0.6,
+  },
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   btnContinueText: {
     fontFamily: 'Inter_600SemiBold',

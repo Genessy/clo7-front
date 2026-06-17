@@ -6,12 +6,14 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
 import { getWeather, WeatherData } from '@/services/weather';
 import { generateOutfit, OutfitResult } from '@/services/outfit';
-import { MOCK_WARDROBE, ClothingItem } from '@/constants/mock-data';
+import { type ClothingItem } from '@/constants/mock-data';
+import { getClothes } from '@/services/clothes';
 
 function WeatherCard({ weather }: { weather: WeatherData }) {
   return (
@@ -33,7 +35,11 @@ function OutfitCard({ label, item }: { label: string; item: ClothingItem | null 
   if (!item) return null;
   return (
     <View style={styles.outfitItem}>
-      <View style={styles.outfitThumb} />
+      {item.photoUri ? (
+        <Image source={{ uri: item.photoUri }} style={styles.outfitThumb} />
+      ) : (
+        <View style={styles.outfitThumb} />
+      )}
       <View>
         <Text style={styles.outfitLabel}>{label}</Text>
         <Text style={styles.outfitName}>{item.name}</Text>
@@ -45,12 +51,14 @@ function OutfitCard({ label, item }: { label: string; item: ClothingItem | null 
 export default function HomeScreen() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [outfit, setOutfit] = useState<OutfitResult | null>(null);
+  const [wardrobe, setWardrobe] = useState<ClothingItem[]>([]);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [loadingOutfit, setLoadingOutfit] = useState(false);
   const [weatherError, setWeatherError] = useState(false);
 
   useEffect(() => {
     loadWeather();
+    getClothes().then(setWardrobe).catch(console.error);
   }, []);
 
   async function loadWeather() {
@@ -67,10 +75,10 @@ export default function HomeScreen() {
   }
 
   async function handleGenerate() {
-    if (!weather) return;
+    if (!weather || wardrobe.length === 0) return;
     setLoadingOutfit(true);
     try {
-      const result = await generateOutfit(weather, MOCK_WARDROBE);
+      const result = await generateOutfit(weather, wardrobe);
       setOutfit(result);
     } finally {
       setLoadingOutfit(false);
@@ -137,21 +145,29 @@ export default function HomeScreen() {
         )}
 
         {!outfit && !loadingWeather && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.btnGenerate,
-              pressed && styles.btnGeneratePressed,
-              loadingOutfit && styles.btnGenerateLoading,
-            ]}
-            onPress={handleGenerate}
-            disabled={loadingOutfit || !weather}
-          >
-            {loadingOutfit ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.btnGenerateText}>✦ Generate Outfit</Text>
-            )}
-          </Pressable>
+          wardrobe.length === 0 ? (
+            <View style={styles.emptyWardrobe}>
+              <Text style={styles.emptyWardrobeText}>
+                Add clothes to your wardrobe to generate an outfit.
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.btnGenerate,
+                pressed && styles.btnGeneratePressed,
+                loadingOutfit && styles.btnGenerateLoading,
+              ]}
+              onPress={handleGenerate}
+              disabled={loadingOutfit || !weather}
+            >
+              {loadingOutfit ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.btnGenerateText}>✦ Generate Outfit</Text>
+              )}
+            </Pressable>
+          )
         )}
       </ScrollView>
     </SafeAreaView>
@@ -354,5 +370,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     color: Colors.textMuted,
+  },
+  emptyWardrobe: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyWardrobeText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,15 @@ import {
   Pressable,
   FlatList,
   TextInput,
+  ActivityIndicator,
+  Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors } from '@/constants/colors';
-import { MOCK_WARDROBE, ClothingItem, ClothingCategory } from '@/constants/mock-data';
+import { type ClothingItem, type ClothingCategory } from '@/constants/mock-data';
+import { getClothes, deleteClothing } from '@/services/clothes';
 
 const CATEGORY_LABELS: Record<ClothingCategory | 'all', string> = {
   all: 'All',
@@ -25,10 +29,21 @@ const CATEGORIES: Array<ClothingCategory | 'all'> = [
   'all', 'top', 'outerwear', 'bottom', 'shoes', 'accessory',
 ];
 
-function ClothingCard({ item }: { item: ClothingItem }) {
+function ClothingCard({ item, onDelete }: { item: ClothingItem; onDelete: () => void }) {
+  function handleDelete() {
+    Alert.alert('Delete', `Remove "${item.name}" from your wardrobe?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    ]);
+  }
+
   return (
     <View style={styles.card}>
-      <View style={styles.thumb} />
+      {item.photoUri ? (
+        <Image source={{ uri: item.photoUri }} style={styles.thumb} />
+      ) : (
+        <View style={styles.thumb} />
+      )}
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{item.name}</Text>
         <Text style={styles.cardMeta}>
@@ -38,6 +53,9 @@ function ClothingCard({ item }: { item: ClothingItem }) {
       <View style={styles.seasonBadge}>
         <Text style={styles.seasonText}>{item.season}</Text>
       </View>
+      <Pressable onPress={handleDelete} style={styles.deleteBtn} hitSlop={8}>
+        <Text style={styles.deleteIcon}>✕</Text>
+      </Pressable>
     </View>
   );
 }
@@ -46,8 +64,29 @@ export default function WardrobeScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<ClothingCategory | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [clothes, setClothes] = useState<ClothingItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = MOCK_WARDROBE.filter((item) => {
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      getClothes()
+        .then(setClothes)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }, [])
+  );
+
+  async function handleDelete(id: string) {
+    try {
+      await deleteClothing(id);
+      setClothes((prev) => prev.filter((c) => c.id !== id));
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to delete clothing.');
+    }
+  }
+
+  const filtered = clothes.filter((item) => {
     const matchCategory = filter === 'all' || item.category === filter;
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
     return matchCategory && matchSearch;
@@ -95,18 +134,24 @@ export default function WardrobeScreen() {
         />
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No items found.</Text>
-          </View>
-        }
-        renderItem={({ item }) => <ClothingCard item={item} />}
-      />
+      {loading ? (
+        <View style={styles.empty}>
+          <ActivityIndicator color={Colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>No items found.</Text>
+            </View>
+          }
+          renderItem={({ item }) => <ClothingCard item={item} onDelete={() => handleDelete(item.id)} />}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -236,6 +281,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     textTransform: 'capitalize',
+  },
+  deleteBtn: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  deleteIcon: {
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   empty: {
     alignItems: 'center',
